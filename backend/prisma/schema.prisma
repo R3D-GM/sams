@@ -30,12 +30,29 @@ enum Role {
 }
 
 model Department {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  users     User[]
-  students  Student[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id          String              @id @default(uuid())
+  name        String              @unique
+  users       User[]
+  memberships StudentDepartment[]
+  attendances Attendance[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+/// Join table: one row per (student, department) pair. This is what lets a
+/// single Student row belong to many departments without duplicating the
+/// student's personal info (fullName, phone, etc.) once per department.
+model StudentDepartment {
+  studentId    String
+  departmentId String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  /// Composite primary key: guarantees a student can't be linked to the
+  /// same department twice (the exact duplication this table exists to prevent).
+  @@id([studentId, departmentId])
+  @@index([departmentId])
 }
 
 /// A logged-in account: SUPER_ADMIN (no department, sees everything)
@@ -61,8 +78,8 @@ model Student {
   studentId    String        @unique
   fullName     String
   phone        String        @unique
-  department   Department    @relation(fields: [departmentId], references: [id])
-  departmentId String
+  /// A student can belong to any number of departments — see StudentDepartment.
+  memberships  StudentDepartment[]
   /// Free-text university department captured at registration (e.g. "Software Engineering").
   /// Not a scoping/login department — just metadata for later analytics filtering.
   universityDepartment String?
@@ -75,24 +92,29 @@ model Student {
 
   attendances Attendance[]
 
-  @@index([departmentId])
   @@index([batch])
   @@index([fullName])
   @@index([universityDepartment])
 }
 
 model Attendance {
-  id        String           @id @default(uuid())
-  studentId String
-  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id           String           @id @default(uuid())
+  studentId    String
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  /// Which department's session this record is for. Required because a student
+  /// can now belong to several departments and may have a separate session
+  /// (and separate attendance) in each one on the same date.
+  departmentId String
+  department   Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   /// Session date, always stored normalised to midnight UTC
-  date      DateTime
-  status    AttendanceStatus
-  notes     String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  date         DateTime
+  status       AttendanceStatus
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
-  /// One record per student per session date
-  @@unique([studentId, date])
+  /// One record per student per department per session date
+  @@unique([studentId, departmentId, date])
   @@index([date])
+  @@index([departmentId])
 }
