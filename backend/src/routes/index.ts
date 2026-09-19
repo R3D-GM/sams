@@ -25,6 +25,9 @@ router.post("/students", requireAuth, a(students.createStudent));
 router.post("/students/import", requireAuth, a(students.importStudents));
 router.patch("/students/:id", requireAuth, a(students.updateStudent));
 router.delete("/students/:id", requireAuth, a(students.deleteStudent));
+// A leader can only add/remove their OWN department's membership (enforced in the controller).
+router.post("/students/:id/memberships", requireAuth, a(students.addMembership));
+router.delete("/students/:id/memberships/:departmentId", requireAuth, a(students.removeMembership));
 
 // --- attendance (department-scoped inside these controllers) ---
 router.get("/attendance/sheet", requireAuth, a(attendance.getSheet));
