@@ -9,7 +9,8 @@ export const phoneSchema = z
 export const studentSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required").max(100),
   phone: phoneSchema,
-  departmentId: z.string().uuid("Department is required"),
+  // A student can belong to one or more departments at once.
+  departmentIds: z.array(z.string().uuid()).min(1, "Select at least one department"),
   universityDepartment: z.string().trim().max(100).optional().or(z.literal("")),
   batch: z.string().trim().min(1, "Batch is required").max(60),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).default("OTHER"),
@@ -27,6 +28,8 @@ export const attendanceEntrySchema = z.object({
 
 export const attendanceSaveSchema = z.object({
   date: z.string().min(1),
+  // Which department's session this batch of entries belongs to.
+  departmentId: z.string().uuid("Department is required"),
   entries: z.array(attendanceEntrySchema).min(1, "No entries to save"),
 });
 
