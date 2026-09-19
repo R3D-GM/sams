@@ -1,22 +1,30 @@
 import type { Response } from "express";
 import { prisma } from "../lib/prisma";
 import { normaliseDate } from "../utils/helpers";
-import { departmentScope } from "../utils/authz";
+import { studentScope } from "../utils/authz";
 import type { AuthRequest } from "../middleware/auth";
 
 function pct(present: number, total: number) {
   return total ? Number(((present / total) * 100).toFixed(1)) : 0;
 }
 
+/** Prisma `where` filter for Attendance queries — leaders see only their own department's records. */
+function attendanceDeptScope(user: AuthRequest["user"]) {
+  if (user!.role === "SUPER_ADMIN") return {};
+  return { departmentId: user!.departmentId ?? "__none__" };
+}
+
 /** Dashboard summary cards + recent sessions, scoped to the caller's department. */
 export async function dashboard(req: AuthRequest, res: Response) {
   const today = normaliseDate(new Date());
-  const scope = departmentScope(req.user!);
+  const studentWhere = studentScope(req.user!);
+  const attendanceWhere = attendanceDeptScope(req.user);
+
   const [totalStudents, activeStudents, todayRecords, allRecords] = await Promise.all([
-    prisma.student.count({ where: scope }),
-    prisma.student.count({ where: { ...scope, status: "ACTIVE" } }),
-    prisma.attendance.findMany({ where: { date: today, student: scope } }),
-    prisma.attendance.findMany({ where: { student: scope }, select: { status: true, date: true } }),
+    prisma.student.count({ where: studentWhere }),
+    prisma.student.count({ where: { ...studentWhere, status: "ACTIVE" } }),
+    prisma.attendance.findMany({ where: { date: today, ...attendanceWhere } }),
+    prisma.attendance.findMany({ where: attendanceWhere, select: { status: true, date: true } }),
   ]);
 
   const presentToday = todayRecords.filter((r) => r.status !== "ABSENT").length;
@@ -49,13 +57,15 @@ export async function dashboard(req: AuthRequest, res: Response) {
 
 /** Full report payload used by the Reports page and exports, scoped to the caller's department. */
 export async function reports(req: AuthRequest, res: Response) {
-  const where: any = { student: departmentScope(req.user!) };
+  const isAdmin = req.user!.role === "SUPER_ADMIN";
+  const where: any = { ...attendanceDeptScope(req.user) };
+  if (isAdmin && req.query.departmentId) where.departmentId = String(req.query.departmentId);
   if (req.query.from || req.query.to) {
     where.date = {};
     if (req.query.from) where.date.gte = normaliseDate(String(req.query.from));
     if (req.query.to) where.date.lte = normaliseDate(String(req.query.to));
   }
-  const records = await prisma.attendance.findMany({ where, include: { student: { include: { department: true } } } });
+  const records = await prisma.attendance.findMany({ where, include: { student: true, department: true } });
 
   const group = <T extends string>(key: (r: (typeof records)[number]) => T) => {
     const map = new Map<T, { present: number; total: number }>();
@@ -91,10 +101,10 @@ export async function reports(req: AuthRequest, res: Response) {
 
   res.json({
     overall: pct(records.filter((r) => r.status !== "ABSENT").length, records.length),
-    totalSessions: new Set(records.map((r) => r.date.toISOString())).size,
+    totalSessions: new Set(records.map((r) => `${r.date.toISOString()}||${r.departmentId}`)).size,
     totalRecords: records.length,
     byStudent: byStudent.sort((a, b) => b.percentage - a.percentage),
-    byDepartment: group((r) => r.student.department.name),
+    byDepartment: group((r) => r.department.name),
     byBatch: group((r) => r.student.batch),
     mostAbsent: [...byStudent].sort((a, b) => b.absent - a.absent).slice(0, 10),
     mostConsistent: [...byStudent].sort((a, b) => b.percentage - a.percentage || b.total - a.total).slice(0, 10),
@@ -105,22 +115,43 @@ export async function reports(req: AuthRequest, res: Response) {
 
 /** Full database export (JSON) for Settings > Backup. SUPER_ADMIN only (enforced in routes). */
 export async function backup(_req: AuthRequest, res: Response) {
-  const [departments, students, attendances] = await Promise.all([
+  const [departments, students, memberships, attendances] = await Promise.all([
     prisma.department.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.student.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.studentDepartment.findMany(),
     prisma.attendance.findMany({ orderBy: { date: "asc" } }),
   ]);
-  res.json({ version: 2, exportedAt: new Date().toISOString(), departments, students, attendances });
+  res.json({ version: 3, exportedAt: new Date().toISOString(), departments, students, memberships, attendances });
 }
 
-/** Restore from a backup file produced by /reports/backup. Replaces existing data. SUPER_ADMIN only. */
+/**
+ * Restore from a backup file produced by /reports/backup. Replaces existing data.
+ * SUPER_ADMIN only. Accepts version 2 backups (old single departmentId per
+ * student) by converting each student's departmentId into one membership row.
+ */
 export async function restore(req: AuthRequest, res: Response) {
-  const { departments = [], students = [], attendances = [] } = req.body ?? {};
+  const { version = 2, departments = [], students = [], memberships = [], attendances = [] } = req.body ?? {};
   if (!Array.isArray(departments) || !Array.isArray(students) || !Array.isArray(attendances)) {
     return res.status(400).json({ message: "Invalid backup file" });
   }
+
+  // Version 2 backups had `departmentId` directly on each student and no
+  // per-attendance departmentId — derive both from the old shape.
+  const derivedMemberships =
+    version >= 3
+      ? memberships
+      : students.filter((s: any) => s.departmentId).map((s: any) => ({ studentId: s.id, departmentId: s.departmentId }));
+  const derivedAttendances =
+    version >= 3
+      ? attendances
+      : attendances.map((a: any) => ({
+          ...a,
+          departmentId: students.find((s: any) => s.id === a.studentId)?.departmentId,
+        }));
+
   await prisma.$transaction([
     prisma.attendance.deleteMany({}),
+    prisma.studentDepartment.deleteMany({}),
     prisma.student.deleteMany({}),
     prisma.department.deleteMany({}),
     prisma.department.createMany({
@@ -132,7 +163,7 @@ export async function restore(req: AuthRequest, res: Response) {
         studentId: s.studentId,
         fullName: s.fullName,
         phone: s.phone,
-        departmentId: s.departmentId,
+        universityDepartment: s.universityDepartment ?? null,
         batch: s.batch,
         gender: s.gender,
         email: s.email ?? null,
@@ -140,18 +171,33 @@ export async function restore(req: AuthRequest, res: Response) {
         createdAt: new Date(s.createdAt),
       })),
     }),
+    prisma.studentDepartment.createMany({
+      data: derivedMemberships
+        .filter((m: any) => m.studentId && m.departmentId)
+        .map((m: any) => ({ studentId: m.studentId, departmentId: m.departmentId })),
+      skipDuplicates: true,
+    }),
     prisma.attendance.createMany({
-      data: attendances.map((a: any) => ({
-        id: a.id,
-        studentId: a.studentId,
-        date: new Date(a.date),
-        status: a.status,
-        notes: a.notes ?? null,
-        createdAt: new Date(a.createdAt),
-      })),
+      data: derivedAttendances
+        .filter((a: any) => a.departmentId)
+        .map((a: any) => ({
+          id: a.id,
+          studentId: a.studentId,
+          departmentId: a.departmentId,
+          date: new Date(a.date),
+          status: a.status,
+          notes: a.notes ?? null,
+          createdAt: new Date(a.createdAt),
+        })),
     }),
   ]);
-  res.json({ message: "Database restored", departments: departments.length, students: students.length, attendances: attendances.length });
+  res.json({
+    message: "Database restored",
+    departments: departments.length,
+    students: students.length,
+    memberships: derivedMemberships.length,
+    attendances: derivedAttendances.length,
+  });
 }
 
 /** Global search across students, scoped to the caller's department. */
@@ -160,7 +206,7 @@ export async function search(req: AuthRequest, res: Response) {
   if (!q) return res.json({ students: [] });
   const students = await prisma.student.findMany({
     where: {
-      ...departmentScope(req.user!),
+      ...studentScope(req.user!),
       OR: [
         { fullName: { contains: q, mode: "insensitive" } },
         { phone: { contains: q, mode: "insensitive" } },
@@ -168,8 +214,8 @@ export async function search(req: AuthRequest, res: Response) {
         { batch: { contains: q, mode: "insensitive" } },
       ],
     },
-    include: { department: true },
+    include: { memberships: { include: { department: true } } },
     take: 8,
   });
-  res.json({ students });
+  res.json({ students: students.map((s) => ({ ...s, departments: s.memberships.map((m) => m.department) })) });
 }
