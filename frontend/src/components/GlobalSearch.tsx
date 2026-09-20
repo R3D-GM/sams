@@ -61,7 +61,7 @@ export default function GlobalSearch() {
                 }}
               >
                 <span className="font-medium">{s.fullName}</span>
-                <span className="ml-2 text-xs text-gray-500">{s.studentId} · {s.department.name} · {s.batch}</span>
+                <span className="ml-2 text-xs text-gray-500">{s.studentId} · {s.departments.map((d) => d.name).join(", ")} · {s.batch}</span>
               </button>
             </li>
           ))}
