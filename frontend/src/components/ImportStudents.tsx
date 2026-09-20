@@ -33,11 +33,10 @@ function normaliseRow(row: RawRow): Record<string, string> {
   return out;
 }
 
-function normaliseGender(v: string): "MALE" | "FEMALE" | "OTHER" {
+function normaliseGender(v: string): "MALE" | "FEMALE" {
   const g = v.trim().toLowerCase();
-  if (g.startsWith("m")) return "MALE";
   if (g.startsWith("f")) return "FEMALE";
-  return "OTHER";
+  return "MALE";
 }
 
 /** Maps one spreadsheet/JSON row onto the shape the /students/import API expects. */
@@ -45,11 +44,12 @@ function mapRow(raw: RawRow, departments: Department[], fallbackDepartmentId: st
   const row = normaliseRow(raw);
   const deptName = pick(row, "department", "class", "clubdepartment");
   const matchedDept = departments.find((d) => d.name.toLowerCase() === deptName.toLowerCase());
+  const departmentId = matchedDept?.id || fallbackDepartmentId;
 
   return {
     fullName: pick(row, "fullname", "name", "studentname"),
     phone: pick(row, "phone", "phonenumber", "mobile", "mobilenumber", "phoneno"),
-    departmentId: matchedDept?.id || fallbackDepartmentId,
+    departmentIds: departmentId ? [departmentId] : [],
     universityDepartment: pick(row, "universitydepartment", "fieldofstudy", "major"),
     batch: pick(row, "batch", "year", "batchyear", "class"),
     gender: normaliseGender(pick(row, "gender", "sex")),
@@ -112,7 +112,7 @@ export default function ImportStudents({ open, onClose, departments }: {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const validCount = rows?.filter((r) => r.fullName && r.phone && r.departmentId).length ?? 0;
+  const validCount = rows?.filter((r) => r.fullName && r.phone && r.departmentIds.length > 0).length ?? 0;
   const invalidCount = (rows?.length ?? 0) - validCount;
 
   return (
