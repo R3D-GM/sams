@@ -1,4 +1,4 @@
-export type Gender = "MALE" | "FEMALE" | "OTHER";
+export type Gender = "MALE" | "FEMALE";
 export type StudentStatus = "ACTIVE" | "INACTIVE";
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE";
 
