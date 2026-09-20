@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { CheckCheck, Save, Search, XCircle } from "lucide-react";
 import clsx from "clsx";
 import { api, apiError } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 import type { AttendanceStatus, SheetRow } from "@/types";
 import { EmptyState, ErrorState, PageHeader, TableSkeleton } from "@/components/ui";
 import { toInputDate } from "@/utils/format";
@@ -11,10 +12,14 @@ import { toInputDate } from "@/utils/format";
 type Draft = Record<string, { status: AttendanceStatus | null; notes: string }>;
 
 export default function Attendance() {
+  const { user } = useAuth();
   const qc = useQueryClient();
+  const isTeacher = user?.role === "TEACHER";
   const [date, setDate] = useState(toInputDate(new Date()));
   const [search, setSearch] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
+  // A leader always takes attendance for their own department — locked, not a choice.
+  // An admin must explicitly pick which department's session this is.
+  const [departmentId, setDepartmentId] = useState(isTeacher ? user?.departmentId ?? "" : "");
   const [batch, setBatch] = useState("");
   const [draft, setDraft] = useState<Draft>({});
 
@@ -22,9 +27,11 @@ export default function Attendance() {
     queryKey: ["facets"],
     queryFn: async () => (await api.get<{ departments: { id: string; name: string }[]; batches: string[] }>("/students/facets")).data,
   });
+  const currentDeptName = facets.data?.departments.find((d) => d.id === departmentId)?.name;
 
   const sheet = useQuery({
     queryKey: ["sheet", date, departmentId, batch],
+    enabled: !!departmentId,
     queryFn: async () =>
       (await api.get<{ date: string; saved: boolean; rows: SheetRow[] }>("/attendance/sheet", {
         params: { date, departmentId, batch },
@@ -55,11 +62,12 @@ export default function Attendance() {
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!departmentId) throw new Error("Choose a department first");
       const entries = Object.entries(draft)
         .filter(([, v]) => v.status)
         .map(([studentId, v]) => ({ studentId, status: v.status!, notes: v.notes }));
       if (entries.length === 0) throw new Error("Mark at least one student before saving");
-      return api.post("/attendance", { date, entries });
+      return api.post("/attendance", { date, departmentId, entries });
     },
     onSuccess: () => {
       toast.success("Attendance saved");
@@ -96,12 +104,18 @@ export default function Attendance() {
     <>
       <PageHeader
         title="Take attendance"
-        description={sheet.data?.saved ? "A session already exists for this date — saving will update it." : "Select a date and mark each student."}
+        description={
+          !departmentId
+            ? "Choose a department to start a session."
+            : sheet.data?.saved
+              ? `A session already exists for ${currentDeptName ?? "this department"} on this date — saving will update it.`
+              : `Marking attendance for ${currentDeptName ?? "this department"}.`
+        }
         actions={
           <>
-            <button className="btn-ghost" onClick={() => setAll("PRESENT")}><CheckCheck className="h-4 w-4" /> Mark all present</button>
-            <button className="btn-ghost" onClick={() => setAll("ABSENT")}><XCircle className="h-4 w-4" /> Mark all absent</button>
-            <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+            <button className="btn-ghost" onClick={() => setAll("PRESENT")} disabled={!departmentId}><CheckCheck className="h-4 w-4" /> Mark all present</button>
+            <button className="btn-ghost" onClick={() => setAll("ABSENT")} disabled={!departmentId}><XCircle className="h-4 w-4" /> Mark all absent</button>
+            <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending || !departmentId}>
               <Save className="h-4 w-4" /> Save attendance
             </button>
           </>
@@ -121,11 +135,17 @@ export default function Attendance() {
           </div>
         </div>
         <div>
-          <label className="label" htmlFor="dep">Department</label>
-          <select id="dep" className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-            <option value="">All</option>
-            {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          <label className="label" htmlFor="dep">Department *</label>
+          {isTeacher ? (
+            <p className="input flex items-center bg-gray-50 text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
+              {currentDeptName ?? "Your department"}
+            </p>
+          ) : (
+            <select id="dep" className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+              <option value="">Select a department…</option>
+              {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          )}
         </div>
         <div>
           <label className="label" htmlFor="bt">Batch</label>
@@ -143,18 +163,20 @@ export default function Attendance() {
       </div>
 
       <div className="card overflow-hidden">
-        {sheet.isLoading ? (
-          <TableSkeleton cols={5} />
+        {!departmentId ? (
+          <EmptyState title="Choose a department" description="Pick which department's session you're taking attendance for." />
+        ) : sheet.isLoading ? (
+          <TableSkeleton cols={4} />
         ) : sheet.isError ? (
           <ErrorState message="Could not load the attendance sheet" onRetry={sheet.refetch} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No students match" description="Adjust the search or filters, or add active students first." />
+          <EmptyState title="No students match" description="Adjust the search or filters, or add active students to this department first." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[760px]">
               <thead className="bg-gray-50 dark:bg-gray-900/60">
                 <tr>
-                  <th className="th">Student</th><th className="th">Department</th><th className="th">Batch</th>
+                  <th className="th">Student</th><th className="th">Batch</th>
                   <th className="th">Status</th><th className="th">Notes</th>
                 </tr>
               </thead>
@@ -167,7 +189,6 @@ export default function Attendance() {
                         <p className="font-medium text-gray-900 dark:text-gray-100">{r.fullName}</p>
                         <p className="font-mono text-xs text-gray-500">{r.code}</p>
                       </td>
-                      <td className="td">{r.department}</td>
                       <td className="td">{r.batch}</td>
                       <td className="td">
                         <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700" role="group" aria-label={`Status for ${r.fullName}`}>
