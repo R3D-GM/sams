@@ -12,8 +12,7 @@ export interface Student {
   studentId: string;
   fullName: string;
   phone: string;
-  departmentId: string;
-  department: Department;
+  departments: Department[];
   universityDepartment: string | null;
   batch: string;
   gender: Gender;
@@ -34,7 +33,6 @@ export interface SheetRow {
   studentId: string;
   code: string;
   fullName: string;
-  department: string;
   batch: string;
   status: AttendanceStatus | null;
   notes: string;
@@ -42,6 +40,8 @@ export interface SheetRow {
 
 export interface SessionSummary {
   date: string;
+  departmentId: string;
+  departmentName: string;
   present: number;
   absent: number;
   late: number;
