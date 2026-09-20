@@ -83,7 +83,7 @@ model Student {
   /// Not a scoping/login department — just metadata for later analytics filtering.
   universityDepartment String?
   batch        String
-  gender       Gender        @default(OTHER)
+  gender       Gender        @default(MALE)
   email        String?
   status       StudentStatus @default(ACTIVE)
   createdAt    DateTime      @default(now())
