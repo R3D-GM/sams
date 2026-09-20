@@ -6,7 +6,7 @@ import type { Student } from "@/types";
 import { Spinner } from "./ui";
 
 export interface StudentFormValues {
-  fullName: string; phone: string; departmentId: string; universityDepartment: string; batch: string;
+  fullName: string; phone: string; departmentIds: string[]; universityDepartment: string; batch: string;
   gender: "MALE" | "FEMALE"; email: string; status: "ACTIVE" | "INACTIVE";
 }
 
@@ -23,12 +23,13 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
   });
   // Teachers only ever have one department in scope, so lock the field instead of showing a choice.
   const isTeacher = user?.role === "TEACHER";
+  const teacherDeptName = facets.data?.departments.find((d) => d.id === user?.departmentId)?.name;
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<StudentFormValues>({
     defaultValues: {
       fullName: student?.fullName ?? "",
       phone: student?.phone ?? "",
-      departmentId: student?.departmentId ?? (isTeacher ? user?.departmentId ?? "" : ""),
+      departmentIds: student?.departments?.map((d) => d.id) ?? (isTeacher && user?.departmentId ? [user.departmentId] : []),
       universityDepartment: student?.universityDepartment ?? "",
       batch: student?.batch ?? "",
       gender: student?.gender ?? "MALE",
@@ -37,8 +38,14 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
     },
   });
 
+  // A leader can only ever act on their own department, regardless of what's
+  // in the form state — this is the client-side mirror of the backend rule.
+  const submit = handleSubmit((values) =>
+    onSubmit(isTeacher && user?.departmentId ? { ...values, departmentIds: [user.departmentId] } : values),
+  );
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form onSubmit={submit} className="space-y-4" noValidate>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className="label" htmlFor="fullName">Full name *</label>
@@ -50,6 +57,9 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
           <input id="phone" className="input" placeholder="+252612345678"
             {...register("phone", { required: "Phone is required", pattern: { value: /^\+?[0-9][0-9\s-]{6,18}$/, message: "Enter a valid phone number" } })} />
           {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone.message}</p>}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            If this phone number already belongs to a registered student, they'll be linked to the new department instead of duplicated.
+          </p>
         </div>
         <div>
           <label className="label" htmlFor="email">Email (optional)</label>
@@ -57,15 +67,35 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
             {...register("email", { pattern: { value: /^\S+@\S+\.\S+$/, message: "Invalid email" } })} />
           {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
         </div>
-        <div>
-          <label className="label" htmlFor="departmentId">Department *</label>
-          <select id="departmentId" className="input" disabled={isTeacher}
-            {...register("departmentId", { required: "Department is required" })}>
-            {!facets.data && <option value="">Loading…</option>}
-            {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          {errors.departmentId && <p className="mt-1 text-xs text-red-600">{errors.departmentId.message}</p>}
+
+        <div className="sm:col-span-2">
+          <label className="label">Departments *</label>
+          {isTeacher ? (
+            <p className="input flex items-center bg-gray-50 text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
+              {teacherDeptName ?? "Your department"}
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                {!facets.data && <span className="text-sm text-gray-500">Loading…</span>}
+                {facets.data?.departments.map((d) => (
+                  <label key={d.id} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" value={d.id} className="h-4 w-4 rounded"
+                      {...register("departmentIds", { validate: (v) => v.length > 0 || "Select at least one department" })} />
+                    {d.name}
+                  </label>
+                ))}
+              </div>
+              {student && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Unchecking a department here won't remove that membership — use the "Remove from department" action on the student's profile instead.
+                </p>
+              )}
+            </>
+          )}
+          {errors.departmentIds && <p className="mt-1 text-xs text-red-600">{errors.departmentIds.message}</p>}
         </div>
+
         <div>
           <label className="label" htmlFor="batch">Batch *</label>
           <input id="batch" className="input" {...register("batch", { required: "Batch is required" })} />
