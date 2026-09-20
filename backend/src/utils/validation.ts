@@ -13,7 +13,7 @@ export const studentSchema = z.object({
   departmentIds: z.array(z.string().uuid()).min(1, "Select at least one department"),
   universityDepartment: z.string().trim().max(100).optional().or(z.literal("")),
   batch: z.string().trim().min(1, "Batch is required").max(60),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]).default("OTHER"),
+  gender: z.enum(["MALE", "FEMALE"]).default("MALE"),
   email: z.string().trim().email("Invalid email").max(255).optional().or(z.literal("")),
   status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 });
