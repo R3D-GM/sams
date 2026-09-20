@@ -15,8 +15,8 @@ export default function History() {
   const [departmentId, setDepartmentId] = useState("");
   const [batch, setBatch] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [openDate, setOpenDate] = useState<string | null>(null);
-  const [toDelete, setToDelete] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ date: string; departmentId: string; departmentName: string } | null>(null);
+  const [toDelete, setToDelete] = useState<{ date: string; departmentId: string } | null>(null);
 
   const facets = useQuery({
     queryKey: ["facets"],
@@ -34,13 +34,14 @@ export default function History() {
   });
 
   const detail = useQuery({
-    queryKey: ["session", openDate],
-    enabled: !!openDate,
-    queryFn: async () => (await api.get(`/attendance/sessions/${openDate}`)).data,
+    queryKey: ["session", open?.date, open?.departmentId],
+    enabled: !!open,
+    queryFn: async () => (await api.get(`/attendance/sessions/${open!.date}`, { params: { departmentId: open!.departmentId } })).data,
   });
 
   const remove = useMutation({
-    mutationFn: async (date: string) => api.delete(`/attendance/sessions/${date}`),
+    mutationFn: async (target: { date: string; departmentId: string }) =>
+      api.delete(`/attendance/sessions/${target.date}`, { params: { departmentId: target.departmentId } }),
     onSuccess: () => {
       toast.success("Session deleted");
       setToDelete(null);
@@ -80,7 +81,7 @@ export default function History() {
 
       <div className="card overflow-hidden">
         {sessions.isLoading ? (
-          <TableSkeleton cols={6} />
+          <TableSkeleton cols={7} />
         ) : sessions.isError ? (
           <ErrorState message="Could not load sessions" onRetry={sessions.refetch} />
         ) : sessions.data!.items.length === 0 ? (
@@ -88,24 +89,27 @@ export default function History() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px]">
+              <table className="w-full min-w-[820px]">
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
-                  <tr><th className="th">Date</th><th className="th">Present</th><th className="th">Late</th><th className="th">Absent</th><th className="th">Rate</th><th className="th sr-only">Actions</th></tr>
+                  <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Present</th><th className="th">Late</th><th className="th">Absent</th><th className="th">Rate</th><th className="th sr-only">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {sessions.data!.items.map((s) => (
-                    <tr key={s.date} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr key={`${s.date}-${s.departmentId}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <td className="td font-medium">{fmtDay(s.date)}</td>
+                      <td className="td">{s.departmentName}</td>
                       <td className="td">{s.present}</td>
                       <td className="td">{s.late}</td>
                       <td className="td">{s.absent}</td>
                       <td className="td">{pct(s.percentage)}</td>
                       <td className="td">
                         <div className="flex justify-end gap-1">
-                          <button className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="View session" onClick={() => setOpenDate(s.date)}>
+                          <button className="rounded p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="View session"
+                            onClick={() => setOpen({ date: s.date, departmentId: s.departmentId, departmentName: s.departmentName })}>
                             <Eye className="h-4 w-4" />
                           </button>
-                          <button className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" aria-label="Delete session" onClick={() => setToDelete(s.date)}>
+                          <button className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" aria-label="Delete session"
+                            onClick={() => setToDelete({ date: s.date, departmentId: s.departmentId })}>
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -120,13 +124,13 @@ export default function History() {
         )}
       </div>
 
-      <Modal open={!!openDate} onClose={() => setOpenDate(null)} title={openDate ? fmtDay(openDate) : ""} width="max-w-3xl">
+      <Modal open={!!open} onClose={() => setOpen(null)} title={open ? `${fmtDay(open.date)} · ${open.departmentName}` : ""} width="max-w-3xl">
         {detail.isLoading ? (
           <TableSkeleton cols={4} />
         ) : (
           <>
             <p className="mb-3 text-sm text-gray-500">
-              To change these records, open the Attendance page and pick this date — saving updates the session.
+              To change these records, open the Attendance page, pick this department and date — saving updates the session.
             </p>
             <div className="max-h-[60vh] overflow-y-auto">
               <table className="w-full">
@@ -152,7 +156,7 @@ export default function History() {
       <ConfirmDialog
         open={!!toDelete}
         title="Delete session"
-        message="All attendance records for this date will be removed."
+        message="All attendance records for this date and department will be removed."
         loading={remove.isPending}
         onCancel={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete)}
