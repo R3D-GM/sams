@@ -7,7 +7,7 @@ import { Spinner } from "./ui";
 
 export interface StudentFormValues {
   fullName: string; phone: string; departmentId: string; universityDepartment: string; batch: string;
-  gender: "MALE" | "FEMALE" | "OTHER"; email: string; status: "ACTIVE" | "INACTIVE";
+  gender: "MALE" | "FEMALE"; email: string; status: "ACTIVE" | "INACTIVE";
 }
 
 /** Accessible add/edit student form with client-side validation. */
@@ -31,7 +31,7 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
       departmentId: student?.departmentId ?? (isTeacher ? user?.departmentId ?? "" : ""),
       universityDepartment: student?.universityDepartment ?? "",
       batch: student?.batch ?? "",
-      gender: student?.gender ?? "OTHER",
+      gender: student?.gender ?? "MALE",
       email: student?.email ?? "",
       status: student?.status ?? "ACTIVE",
     },
@@ -81,7 +81,6 @@ export default function StudentForm({ student, onSubmit, onCancel }: {
           <select id="gender" className="input" {...register("gender")}>
             <option value="MALE">Male</option>
             <option value="FEMALE">Female</option>
-            <option value="OTHER">Other</option>
           </select>
         </div>
         <div>
