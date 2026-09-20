@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { BarChart2, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { api, apiError } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
 import type { Paginated, Student } from "@/types";
 import StudentForm, { type StudentFormValues } from "@/components/StudentForm";
 import ImportStudents from "@/components/ImportStudents";
@@ -12,6 +13,8 @@ import { fmtDate } from "@/utils/format";
 import { exportCSV } from "@/utils/export";
 
 export default function Students() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "SUPER_ADMIN";
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -46,10 +49,15 @@ export default function Students() {
     onError: (e) => toast.error(apiError(e)),
   });
 
+  // Admin deletes the student outright. A leader instead removes only their
+  // own department's membership — the backend rejects a full delete from them.
   const remove = useMutation({
-    mutationFn: async (id: string) => api.delete(`/students/${id}`),
+    mutationFn: async (student: Student) =>
+      isAdmin
+        ? api.delete(`/students/${student.id}`)
+        : api.delete(`/students/${student.id}/memberships/${user?.departmentId}`),
     onSuccess: () => {
-      toast.success("Student deleted");
+      toast.success(isAdmin ? "Student deleted" : "Removed from your department");
       setToDelete(null);
       qc.invalidateQueries({ queryKey: ["students"] });
     },
@@ -65,7 +73,10 @@ export default function Students() {
           <>
             <button
               className="btn-ghost"
-              onClick={() => list.data && exportCSV(list.data.items.map(({ id, ...r }) => r), "students")}
+              onClick={() => list.data && exportCSV(
+                list.data.items.map(({ id, departments, ...r }) => ({ ...r, departments: departments.map((d) => d.name).join(", ") })),
+                "students",
+              )}
             >
               <Download className="h-4 w-4" /> Export CSV
             </button>
@@ -112,7 +123,7 @@ export default function Students() {
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
                   <tr>
                     <th className="th">Student ID</th><th className="th">Name</th><th className="th">Phone</th>
-                    <th className="th">Department</th><th className="th">Batch</th><th className="th">Status</th>
+                    <th className="th">Departments</th><th className="th">Batch</th><th className="th">Status</th>
                     <th className="th">Registered</th><th className="th sr-only">Actions</th>
                   </tr>
                 </thead>
@@ -126,7 +137,15 @@ export default function Students() {
                         </Link>
                       </td>
                       <td className="td">{s.phone}</td>
-                      <td className="td">{s.department.name}</td>
+                      <td className="td">
+                        <div className="flex flex-wrap gap-1">
+                          {s.departments.map((d) => (
+                            <span key={d.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800">
+                              {d.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="td">{s.batch}</td>
                       <td className="td"><StatusBadge status={s.status} /></td>
                       <td className="td">{fmtDate(s.createdAt)}</td>
@@ -139,7 +158,8 @@ export default function Students() {
                             onClick={() => { setEditing(s); setFormOpen(true); }}>
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10" aria-label={`Delete ${s.fullName}`}
+                          <button className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                            aria-label={isAdmin ? `Delete ${s.fullName}` : `Remove ${s.fullName} from your department`}
                             onClick={() => setToDelete(s)}>
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -163,11 +183,19 @@ export default function Students() {
 
       <ConfirmDialog
         open={!!toDelete}
-        title="Delete student"
-        message={`This will permanently remove ${toDelete?.fullName} and all their attendance records.`}
+        title={isAdmin ? "Delete student" : "Remove from your department"}
+        message={
+          isAdmin
+            ? `This will permanently remove ${toDelete?.fullName} and all their department memberships and attendance records.`
+            : `This removes ${toDelete?.fullName} from your department only. ${
+                toDelete && toDelete.departments.length <= 1
+                  ? "This is their only department, so their whole student record will be removed."
+                  : "Their record and other department memberships stay untouched."
+              }`
+        }
         loading={remove.isPending}
         onCancel={() => setToDelete(null)}
-        onConfirm={() => toDelete && remove.mutate(toDelete.id)}
+        onConfirm={() => toDelete && remove.mutate(toDelete)}
       />
     </>
   );
