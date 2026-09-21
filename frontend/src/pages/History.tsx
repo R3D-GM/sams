@@ -6,6 +6,7 @@ import { api, apiError } from "@/services/api";
 import type { Paginated, SessionSummary, Student } from "@/types";
 import { ConfirmDialog, EmptyState, ErrorState, Modal, PageHeader, Pagination, StatusBadge, TableSkeleton } from "@/components/ui";
 import { fmtDay, pct } from "@/utils/format";
+import { departmentLabel } from "@/utils/departments";
 
 export default function History() {
   const qc = useQueryClient();
@@ -61,7 +62,7 @@ export default function History() {
         <div>
           <label className="label" htmlFor="dep">Department</label>
           <select id="dep" className="input" value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}>
-            <option value="">All</option>{facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            <option value="">All</option>{facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{departmentLabel(d.name)}</option>)}
           </select>
         </div>
         <div>
@@ -81,7 +82,7 @@ export default function History() {
 
       <div className="card overflow-hidden">
         {sessions.isLoading ? (
-          <TableSkeleton cols={7} />
+          <TableSkeleton cols={6} />
         ) : sessions.isError ? (
           <ErrorState message="Could not load sessions" onRetry={sessions.refetch} />
         ) : sessions.data!.items.length === 0 ? (
@@ -91,15 +92,14 @@ export default function History() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px]">
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
-                  <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Present</th><th className="th">Late</th><th className="th">Absent</th><th className="th">Rate</th><th className="th sr-only">Actions</th></tr>
+                  <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Present</th><th className="th">Absent</th><th className="th">Rate</th><th className="th sr-only">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {sessions.data!.items.map((s) => (
                     <tr key={`${s.date}-${s.departmentId}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <td className="td font-medium">{fmtDay(s.date)}</td>
-                      <td className="td">{s.departmentName}</td>
+                      <td className="td">{departmentLabel(s.departmentName)}</td>
                       <td className="td">{s.present}</td>
-                      <td className="td">{s.late}</td>
                       <td className="td">{s.absent}</td>
                       <td className="td">{pct(s.percentage)}</td>
                       <td className="td">
@@ -124,7 +124,7 @@ export default function History() {
         )}
       </div>
 
-      <Modal open={!!open} onClose={() => setOpen(null)} title={open ? `${fmtDay(open.date)} · ${open.departmentName}` : ""} width="max-w-3xl">
+      <Modal open={!!open} onClose={() => setOpen(null)} title={open ? `${fmtDay(open.date)} · ${departmentLabel(open.departmentName)}` : ""} width="max-w-3xl">
         {detail.isLoading ? (
           <TableSkeleton cols={4} />
         ) : (
