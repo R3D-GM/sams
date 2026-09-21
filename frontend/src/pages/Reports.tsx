@@ -8,6 +8,7 @@ import { api } from "@/services/api";
 import type { ReportData } from "@/types";
 import { ErrorState, PageHeader, Skeleton, StatCard, EmptyState } from "@/components/ui";
 import { pct } from "@/utils/format";
+import { departmentLabel } from "@/utils/departments";
 import { exportCSV, exportExcel, exportPDF } from "@/utils/export";
 import { BarChart3, CalendarDays, Percent } from "lucide-react";
 
@@ -34,6 +35,8 @@ export default function Reports() {
 
   if (isLoading) return <div className="grid gap-4 sm:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
   if (isError || !data) return <ErrorState message="Could not load reports" onRetry={refetch} />;
+
+  const byDepartment = data.byDepartment.map((d) => ({ ...d, name: departmentLabel(d.name) }));
 
   return (
     <>
@@ -87,7 +90,7 @@ export default function Reports() {
 
             <ChartCard title="Attendance by department">
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={data.byDepartment} layout="vertical">
+                <BarChart data={byDepartment} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis type="number" unit="%" fontSize={12} /><YAxis type="category" dataKey="name" width={130} fontSize={11} />
                   <Tooltip /><Bar dataKey="percentage" fill="#10b981" radius={[0, 4, 4, 0]} />
