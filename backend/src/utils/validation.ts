@@ -1,20 +1,25 @@
 import { z } from "zod";
 
-// International-friendly phone validation: 7-15 digits, optional leading +
+// Ethiopian phone number: must start with +251 followed by exactly 9 digits, e.g. +251912345678
 export const phoneSchema = z
   .string()
   .trim()
-  .regex(/^\+?[0-9][0-9\s-]{6,18}$/u, "Enter a valid phone number");
+  .regex(/^\+251\d{9}$/, "Phone number must start with +251 and be followed by 9 digits, e.g. +251912345678");
 
 export const studentSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required").max(100),
   phone: phoneSchema,
   // A student can belong to one or more departments at once.
   departmentIds: z.array(z.string().uuid()).min(1, "Select at least one department"),
-  universityDepartment: z.string().trim().max(100).optional().or(z.literal("")),
-  batch: z.string().trim().min(1, "Batch is required").max(60),
+  universityDepartment: z
+    .string()
+    .trim()
+    .min(1, "University department is required")
+    .max(100)
+    .refine((v) => !/^\d+$/.test(v), "University department must be text, not only numbers"),
+  // Batch must be exactly 4 numeric digits, e.g. 2017 — not a fixed list, any 4-digit value is accepted.
+  batch: z.string().trim().regex(/^\d{4}$/, "Batch must be exactly 4 digits, e.g. 2017"),
   gender: z.enum(["MALE", "FEMALE"]).default("MALE"),
-  email: z.string().trim().email("Invalid email").max(255).optional().or(z.literal("")),
   status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 });
 
@@ -22,7 +27,8 @@ export const studentUpdateSchema = studentSchema.partial();
 
 export const attendanceEntrySchema = z.object({
   studentId: z.string().uuid(),
-  status: z.enum(["PRESENT", "ABSENT", "LATE"]),
+  // "Late" has been removed as a selectable attendance status.
+  status: z.enum(["PRESENT", "ABSENT"]),
   notes: z.string().trim().max(300).optional().or(z.literal("")),
 });
 
