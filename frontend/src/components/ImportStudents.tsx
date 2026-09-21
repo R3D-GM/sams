@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Upload } from "lucide-react";
 import { api, apiError } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
+import { departmentLabel } from "@/utils/departments";
 import { Modal, Spinner } from "./ui";
 
 interface Department { id: string; name: string }
@@ -53,7 +54,6 @@ function mapRow(raw: RawRow, departments: Department[], fallbackDepartmentId: st
     universityDepartment: pick(row, "universitydepartment", "fieldofstudy", "major"),
     batch: pick(row, "batch", "year", "batchyear", "class"),
     gender: normaliseGender(pick(row, "gender", "sex")),
-    email: pick(row, "email", "emailaddress"),
     status: "ACTIVE" as const,
   };
 }
@@ -134,7 +134,7 @@ export default function ImportStudents({ open, onClose, departments }: {
           </label>
           <select id="import-dept" className="input" value={targetDept} onChange={(e) => setTargetDept(e.target.value)}>
             <option value="">Select a department…</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {departments.map((d) => <option key={d.id} value={d.id}>{departmentLabel(d.name)}</option>)}
           </select>
         </div>
       )}
