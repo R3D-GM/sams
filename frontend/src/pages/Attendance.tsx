@@ -8,8 +8,12 @@ import { useAuth } from "@/hooks/useAuth";
 import type { AttendanceStatus, SheetRow } from "@/types";
 import { EmptyState, ErrorState, PageHeader, TableSkeleton } from "@/components/ui";
 import { toInputDate } from "@/utils/format";
+import { departmentLabel } from "@/utils/departments";
 
 type Draft = Record<string, { status: AttendanceStatus | null; notes: string }>;
+
+// Only these two statuses are selectable. "Late" has been removed as an option.
+const STATUSES: AttendanceStatus[] = ["PRESENT", "ABSENT"];
 
 export default function Attendance() {
   const { user } = useAuth();
@@ -27,7 +31,7 @@ export default function Attendance() {
     queryKey: ["facets"],
     queryFn: async () => (await api.get<{ departments: { id: string; name: string }[]; batches: string[] }>("/students/facets")).data,
   });
-  const currentDeptName = facets.data?.departments.find((d) => d.id === departmentId)?.name;
+  const currentDeptName = departmentLabel(facets.data?.departments.find((d) => d.id === departmentId)?.name);
 
   const sheet = useQuery({
     queryKey: ["sheet", date, departmentId, batch],
@@ -93,11 +97,10 @@ export default function Attendance() {
   const counts = Object.values(draft).reduce(
     (acc, v) => {
       if (v.status === "PRESENT") acc.present++;
-      else if (v.status === "LATE") acc.late++;
       else if (v.status === "ABSENT") acc.absent++;
       return acc;
     },
-    { present: 0, absent: 0, late: 0 },
+    { present: 0, absent: 0 },
   );
 
   return (
@@ -108,8 +111,8 @@ export default function Attendance() {
           !departmentId
             ? "Choose a department to start a session."
             : sheet.data?.saved
-              ? `A session already exists for ${currentDeptName ?? "this department"} on this date — saving will update it.`
-              : `Marking attendance for ${currentDeptName ?? "this department"}.`
+              ? `A session already exists for ${currentDeptName || "this department"} on this date — saving will update it.`
+              : `Marking attendance for ${currentDeptName || "this department"}.`
         }
         actions={
           <>
@@ -138,12 +141,12 @@ export default function Attendance() {
           <label className="label" htmlFor="dep">Department *</label>
           {isTeacher ? (
             <p className="input flex items-center bg-gray-50 text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
-              {currentDeptName ?? "Your department"}
+              {currentDeptName || "Your department"}
             </p>
           ) : (
             <select id="dep" className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
               <option value="">Select a department…</option>
-              {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{departmentLabel(d.name)}</option>)}
             </select>
           )}
         </div>
@@ -158,7 +161,6 @@ export default function Attendance() {
 
       <div className="mb-4 flex flex-wrap gap-3 text-sm">
         <span className="badge bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">Present {counts.present}</span>
-        <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">Late {counts.late}</span>
         <span className="badge bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">Absent {counts.absent}</span>
       </div>
 
@@ -192,7 +194,7 @@ export default function Attendance() {
                       <td className="td">{r.batch}</td>
                       <td className="td">
                         <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700" role="group" aria-label={`Status for ${r.fullName}`}>
-                          {(["PRESENT", "LATE", "ABSENT"] as AttendanceStatus[]).map((s) => (
+                          {STATUSES.map((s) => (
                             <button
                               key={s}
                               type="button"
@@ -200,8 +202,7 @@ export default function Attendance() {
                               className={clsx(
                                 "px-3 py-1.5 text-xs font-medium transition",
                                 current === s
-                                  ? s === "PRESENT" ? "bg-emerald-600 text-white"
-                                    : s === "LATE" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
+                                  ? s === "PRESENT" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
                                   : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800",
                               )}
                             >
