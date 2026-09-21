@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/services/api";
 import type { Student } from "@/types";
+import { departmentLabel } from "@/utils/departments";
 
 /** Global student search. Press "/" anywhere to focus it. */
 export default function GlobalSearch() {
@@ -61,7 +62,7 @@ export default function GlobalSearch() {
                 }}
               >
                 <span className="font-medium">{s.fullName}</span>
-                <span className="ml-2 text-xs text-gray-500">{s.studentId} · {s.departments.map((d) => d.name).join(", ")} · {s.batch}</span>
+                <span className="ml-2 text-xs text-gray-500">{s.studentId} · {s.departments.map((d) => departmentLabel(d.name)).join(", ")} · {s.batch}</span>
               </button>
             </li>
           ))}
