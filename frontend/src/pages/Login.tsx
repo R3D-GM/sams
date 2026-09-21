@@ -33,7 +33,7 @@ export default function Login() {
           <span className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-xl bg-brand-600 text-white">
             <img src={logo} alt="Logo" className="h-14 w-14 rounded-xl object-cover" />
           </span>
-          <h1 className="text-xl font-semibold">Attendance Manager</h1>
+          <h1 className="text-xl font-semibold">የመዝሙር እና ስነ-ጥበባት ክፍል የአቴንዳንስ መዝገብ</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Sign in to your instructor account</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
