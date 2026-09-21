@@ -144,7 +144,6 @@ export async function createStudent(req: AuthRequest, res: Response) {
       universityDepartment: data.universityDepartment || null,
       batch: data.batch,
       gender: data.gender,
-      email: data.email || null,
       status: data.status,
       studentId: formatStudentId(count + 1),
       memberships: { create: departmentIds.map((departmentId) => ({ departmentId })) },
@@ -168,7 +167,6 @@ export async function updateStudent(req: AuthRequest, res: Response) {
     where: { id: req.params.id },
     data: {
       ...rest,
-      email: data.email !== undefined ? data.email || null : undefined,
       ...(data.universityDepartment !== undefined
         ? { universityDepartment: data.universityDepartment || null }
         : {}),
@@ -292,7 +290,6 @@ export async function importStudents(req: AuthRequest, res: Response) {
         universityDepartment: parsed.data.universityDepartment || null,
         batch: parsed.data.batch,
         gender: parsed.data.gender,
-        email: parsed.data.email || null,
         status: parsed.data.status,
         studentId: formatStudentId(count),
         memberships: { create: finalDepartmentIds.map((departmentId) => ({ departmentId })) },
