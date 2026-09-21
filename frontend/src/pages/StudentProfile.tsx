@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Student, AttendanceStatus, Department } from "@/types";
 import { ConfirmDialog, ErrorState, PageHeader, Skeleton, StatusBadge, EmptyState } from "@/components/ui";
 import { fmtDate, pct } from "@/utils/format";
+import { departmentLabel } from "@/utils/departments";
 
 interface Profile extends Student {
   attendances: { id: string; date: string; status: AttendanceStatus; notes: string | null; department: Department }[];
@@ -56,7 +57,7 @@ export default function StudentProfile() {
       </Link>
       <PageHeader
         title={data.fullName}
-        description={`${data.studentId} · ${data.departments.map((d) => d.name).join(", ")} · ${data.batch}`}
+        description={`${data.studentId} · ${data.departments.map((d) => departmentLabel(d.name)).join(", ")} · ${data.batch}`}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -80,11 +81,11 @@ export default function StudentProfile() {
               <dd className="flex flex-wrap gap-1.5">
                 {data.departments.map((d) => (
                   <span key={d.id} className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2.5 pr-1 text-xs dark:bg-gray-800">
-                    {d.name}
+                    {departmentLabel(d.name)}
                     {canRemove(d) && (
                       <button
                         className="rounded-full p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700"
-                        aria-label={`Remove ${data.fullName} from ${d.name}`}
+                        aria-label={`Remove ${data.fullName} from ${departmentLabel(d.name)}`}
                         onClick={() => setToRemove(d)}
                       >
                         <X className="h-3 w-3" />
@@ -118,7 +119,7 @@ export default function StudentProfile() {
                 {data.attendances.map((a) => (
                   <tr key={a.id}>
                     <td className="td">{fmtDate(a.date)}</td>
-                    <td className="td">{a.department.name}</td>
+                    <td className="td">{departmentLabel(a.department.name)}</td>
                     <td className="td"><StatusBadge status={a.status} /></td>
                     <td className="td">{a.notes || "—"}</td>
                   </tr>
@@ -132,7 +133,7 @@ export default function StudentProfile() {
       <ConfirmDialog
         open={!!toRemove}
         title="Remove from department"
-        message={`Remove ${data.fullName} from ${toRemove?.name}? ${
+        message={`Remove ${data.fullName} from ${departmentLabel(toRemove?.name)}? ${
           data.departments.length <= 1
             ? "This is their only department, so their whole student record will be removed."
             : "Their record and other department memberships stay untouched."
