@@ -11,6 +11,7 @@ import ImportStudents from "@/components/ImportStudents";
 import { ConfirmDialog, EmptyState, ErrorState, Modal, PageHeader, Pagination, StatusBadge, TableSkeleton } from "@/components/ui";
 import { fmtDate } from "@/utils/format";
 import { exportCSV } from "@/utils/export";
+import { departmentLabel } from "@/utils/departments";
 
 export default function Students() {
   const { user } = useAuth();
@@ -74,7 +75,7 @@ export default function Students() {
             <button
               className="btn-ghost"
               onClick={() => list.data && exportCSV(
-                list.data.items.map(({ id, departments, ...r }) => ({ ...r, departments: departments.map((d) => d.name).join(", ") })),
+                list.data.items.map(({ id, departments, ...r }) => ({ ...r, departments: departments.map((d) => departmentLabel(d.name)).join(", ") })),
                 "students",
               )}
             >
@@ -99,7 +100,7 @@ export default function Students() {
         <select className="input" value={departmentId} aria-label="Filter by department"
           onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}>
           <option value="">All departments</option>
-          {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {facets.data?.departments.map((d) => <option key={d.id} value={d.id}>{departmentLabel(d.name)}</option>)}
         </select>
         <select className="input" value={batch} aria-label="Filter by batch"
           onChange={(e) => { setBatch(e.target.value); setPage(1); }}>
@@ -141,7 +142,7 @@ export default function Students() {
                         <div className="flex flex-wrap gap-1">
                           {s.departments.map((d) => (
                             <span key={d.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800">
-                              {d.name}
+                              {departmentLabel(d.name)}
                             </span>
                           ))}
                         </div>
