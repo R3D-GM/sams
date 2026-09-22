@@ -19,3 +19,21 @@ export function departmentLabel(name: string | null | undefined): string {
   if (!name) return "";
   return DEPARTMENT_LABELS[name] ?? name;
 }
+
+/**
+ * Matches free text (e.g. one answer from an imported spreadsheet) against a
+ * department, by either its internal English name or its Amharic label —
+ * case-insensitive, whitespace-trimmed. Used for imports where the source
+ * data (like a Google Form export) contains the Amharic label rather than
+ * the internal database name.
+ */
+export function matchDepartmentByText(
+  text: string,
+  departments: { id: string; name: string }[],
+): { id: string; name: string } | undefined {
+  const needle = text.trim().toLowerCase();
+  if (!needle) return undefined;
+  return departments.find(
+    (d) => d.name.trim().toLowerCase() === needle || departmentLabel(d.name).trim().toLowerCase() === needle,
+  );
+}
