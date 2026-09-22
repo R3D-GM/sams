@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Upload } from "lucide-react";
 import { api, apiError } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
-import { departmentLabel } from "@/utils/departments";
+import { departmentLabel, matchDepartmentByText } from "@/utils/departments";
 import { Modal, Spinner } from "./ui";
 
 interface Department { id: string; name: string }
@@ -36,25 +36,42 @@ function normaliseRow(row: RawRow): Record<string, string> {
 
 function normaliseGender(v: string): "MALE" | "FEMALE" {
   const g = v.trim().toLowerCase();
-  if (g.startsWith("f")) return "FEMALE";
+  if (g.startsWith("f") || g === "ሴት") return "FEMALE";
   return "MALE";
+}
+
+function normaliseStatus(v: string): "ACTIVE" | "INACTIVE" {
+  return v.trim().toLowerCase().startsWith("inactive") ? "INACTIVE" : "ACTIVE";
+}
+
+/** Splits a multi-select answer cell (e.g. "መዝሙር ክፍል, ስነ-ስዕል ክፍል") into individual selections. */
+function splitMultiValue(v: string): string[] {
+  return v.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
 }
 
 /** Maps one spreadsheet/JSON row onto the shape the /students/import API expects. */
 function mapRow(raw: RawRow, departments: Department[], fallbackDepartmentId: string) {
   const row = normaliseRow(raw);
-  const deptName = pick(row, "department", "class", "clubdepartment");
-  const matchedDept = departments.find((d) => d.name.toLowerCase() === deptName.toLowerCase());
-  const departmentId = matchedDept?.id || fallbackDepartmentId;
+  // "department" covers a plain CSV column; "departments" covers Google
+  // Forms' export of a "Departments" question (which may hold more than
+  // one selection if it's a checkbox/multi-select question).
+  const deptCell = pick(row, "departments", "department", "class", "clubdepartment");
+  const matchedIds = splitMultiValue(deptCell)
+    .map((token) => matchDepartmentByText(token, departments)?.id)
+    .filter((id): id is string => !!id);
+  // Only fall back to the admin's selected default department when the row
+  // itself didn't name any recognisable department — the row's own answer
+  // always wins when present, English or Amharic.
+  const departmentIds = matchedIds.length > 0 ? matchedIds : (fallbackDepartmentId ? [fallbackDepartmentId] : []);
 
   return {
     fullName: pick(row, "fullname", "name", "studentname"),
     phone: pick(row, "phone", "phonenumber", "mobile", "mobilenumber", "phoneno"),
-    departmentIds: departmentId ? [departmentId] : [],
+    departmentIds,
     universityDepartment: pick(row, "universitydepartment", "fieldofstudy", "major"),
     batch: pick(row, "batch", "year", "batchyear", "class"),
     gender: normaliseGender(pick(row, "gender", "sex")),
-    status: "ACTIVE" as const,
+    status: normaliseStatus(pick(row, "status")),
   };
 }
 
@@ -130,10 +147,10 @@ export default function ImportStudents({ open, onClose, departments }: {
       {!isTeacher && (
         <div className="mb-4">
           <label className="label" htmlFor="import-dept">
-            Department (used for rows that don't have their own department column)
+            Default department (optional — only used for rows where the file itself doesn't name a valid department)
           </label>
           <select id="import-dept" className="input" value={targetDept} onChange={(e) => setTargetDept(e.target.value)}>
-            <option value="">Select a department…</option>
+            <option value="">No default — skip rows with no recognised department</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{departmentLabel(d.name)}</option>)}
           </select>
         </div>
