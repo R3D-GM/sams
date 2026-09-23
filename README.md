@@ -111,4 +111,6 @@ frontend/
 - Phone numbers must match `+?digits` (7-15 digits) and are unique per student
 - Required fields are enforced on the client (React Hook Form) and server (Zod)
 - One attendance record per student per date, enforced by a database unique index
-"# sams" 
+"# sams"
+AUTHOR
+Rediet Girma
