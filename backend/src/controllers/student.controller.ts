@@ -85,8 +85,25 @@ export async function getStudent(req: AuthRequest, res: Response) {
       attendances: { orderBy: { date: "desc" }, take: 100, include: { department: true } },
     },
   });
-  const total = student.attendances.length;
-  const present = student.attendances.filter((a) => a.status !== "ABSENT").length;
+
+  // Fairness fix: the denominator is every session the student's department(s)
+  // have EVER held — not just the sessions that happened to occur since this
+  // student was registered. Otherwise a brand-new member who attends their
+  // first-ever session shows a misleading 100%, while a long-standing member
+  // with the same 2-out-of-3 record looks worse by comparison. A session held
+  // before the student joined (so they have no record for it) now correctly
+  // counts against them in the denominator, same as an absence would.
+  const departmentIds = student.memberships.map((m) => m.departmentId);
+  const allSessions = departmentIds.length
+    ? await prisma.attendance.findMany({
+        where: { departmentId: { in: departmentIds } },
+        select: { date: true, departmentId: true },
+        distinct: ["departmentId", "date"],
+      })
+    : [];
+  const total = allSessions.length;
+  const present = student.attendances.filter((a) => a.status === "PRESENT").length;
+
   res.json({
     ...student,
     departments: student.memberships.map((m) => m.department),
