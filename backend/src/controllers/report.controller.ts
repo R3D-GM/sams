@@ -85,9 +85,32 @@ export async function reports(req: AuthRequest, res: Response) {
     }));
   };
 
-  const byStudent = group((r) => `${r.student.fullName}||${r.student.studentId}` as string).map((s) => {
-    const [name, code] = s.name.split("||");
-    return { ...s, name, code };
+  // Fairness fix (same principle as the student profile page): a student's
+  // percentage is measured against every session THEIR department(s) held
+  // within this date range — not just the count of records that happen to
+  // exist for them. Otherwise a recently-joined student who attends their
+  // one available session shows a misleading 100%.
+  const sessionsByDept = new Map<string, Set<string>>();
+  for (const r of records) {
+    const set = sessionsByDept.get(r.departmentId) ?? new Set<string>();
+    set.add(r.date.toISOString());
+    sessionsByDept.set(r.departmentId, set);
+  }
+  const byStudentMap = new Map<string, { name: string; code: string; present: number; deptIds: Set<string> }>();
+  for (const r of records) {
+    const row = byStudentMap.get(r.studentId) ?? {
+      name: r.student.fullName,
+      code: r.student.studentId,
+      present: 0,
+      deptIds: new Set<string>(),
+    };
+    row.deptIds.add(r.departmentId);
+    if (r.status === "PRESENT") row.present++;
+    byStudentMap.set(r.studentId, row);
+  }
+  const byStudent = [...byStudentMap.values()].map((s) => {
+    const total = [...s.deptIds].reduce((sum, d) => sum + (sessionsByDept.get(d)?.size ?? 0), 0);
+    return { name: s.name, code: s.code, present: s.present, absent: total - s.present, total, percentage: pct(s.present, total) };
   });
 
   const monthly = group((r) => r.date.toISOString().slice(0, 7)).sort((a, b) => a.name.localeCompare(b.name));
