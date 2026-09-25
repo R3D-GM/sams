@@ -174,57 +174,99 @@ export default function Attendance() {
         ) : rows.length === 0 ? (
           <EmptyState title="No students match" description="Adjust the search or filters, or add active students to this department first." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px]">
-              <thead className="bg-gray-50 dark:bg-gray-900/60">
-                <tr>
-                  <th className="th">Student</th><th className="th">Batch</th>
-                  <th className="th">Status</th><th className="th">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {rows.map((r) => {
-                  const current = draft[r.studentId]?.status ?? null;
-                  return (
-                    <tr key={r.studentId}>
-                      <td className="td">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">{r.fullName}</p>
-                        <p className="font-mono text-xs text-gray-500">{r.code}</p>
-                      </td>
-                      <td className="td">{r.batch}</td>
-                      <td className="td">
-                        <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700" role="group" aria-label={`Status for ${r.fullName}`}>
-                          {STATUSES.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], status: s } }))}
-                              className={clsx(
-                                "px-3 py-1.5 text-xs font-medium transition",
-                                current === s
-                                  ? s === "PRESENT" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-                                  : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800",
-                              )}
-                            >
-                              {s.charAt(0) + s.slice(1).toLowerCase()}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="td">
-                        <input
-                          className="input py-1.5"
-                          placeholder="Optional note"
-                          value={draft[r.studentId]?.notes ?? ""}
-                          aria-label={`Notes for ${r.fullName}`}
-                          onChange={(e) => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], notes: e.target.value } }))}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div>
+            {/* Mobile: one big-tap card per student — this is the screen leaders use live during a session */}
+            <div className="divide-y divide-gray-100 sm:hidden dark:divide-gray-800">
+              {rows.map((r) => {
+                const current = draft[r.studentId]?.status ?? null;
+                return (
+                  <div key={r.studentId} className="p-4">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{r.fullName}</p>
+                    <p className="font-mono text-xs text-gray-500">{r.code} · Batch {r.batch}</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {STATUSES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], status: s } }))}
+                          className={clsx(
+                            "rounded-lg border py-3 text-sm font-semibold transition",
+                            current === s
+                              ? s === "PRESENT"
+                                ? "border-emerald-600 bg-emerald-600 text-white"
+                                : "border-red-600 bg-red-600 text-white"
+                              : "border-gray-300 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300",
+                          )}
+                        >
+                          {s.charAt(0) + s.slice(1).toLowerCase()}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      className="input mt-2"
+                      placeholder="Optional note"
+                      value={draft[r.studentId]?.notes ?? ""}
+                      aria-label={`Notes for ${r.fullName}`}
+                      onChange={(e) => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], notes: e.target.value } }))}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop / tablet: compact table */}
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full min-w-[760px]">
+                <thead className="bg-gray-50 dark:bg-gray-900/60">
+                  <tr>
+                    <th className="th">Student</th><th className="th">Batch</th>
+                    <th className="th">Status</th><th className="th">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {rows.map((r) => {
+                    const current = draft[r.studentId]?.status ?? null;
+                    return (
+                      <tr key={r.studentId}>
+                        <td className="td">
+                          <p className="font-medium text-gray-900 dark:text-gray-100">{r.fullName}</p>
+                          <p className="font-mono text-xs text-gray-500">{r.code}</p>
+                        </td>
+                        <td className="td">{r.batch}</td>
+                        <td className="td">
+                          <div className="inline-flex overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700" role="group" aria-label={`Status for ${r.fullName}`}>
+                            {STATUSES.map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], status: s } }))}
+                                className={clsx(
+                                  "px-3 py-1.5 text-xs font-medium transition",
+                                  current === s
+                                    ? s === "PRESENT" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+                                    : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800",
+                                )}
+                              >
+                                {s.charAt(0) + s.slice(1).toLowerCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="td">
+                          <input
+                            className="input py-1.5"
+                            placeholder="Optional note"
+                            value={draft[r.studentId]?.notes ?? ""}
+                            aria-label={`Notes for ${r.fullName}`}
+                            onChange={(e) => setDraft((d) => ({ ...d, [r.studentId]: { ...d[r.studentId], notes: e.target.value } }))}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
