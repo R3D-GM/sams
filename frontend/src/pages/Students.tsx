@@ -119,7 +119,51 @@ export default function Students() {
             action={<button className="btn-primary" onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" /> Add student</button>} />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Mobile: stacked cards instead of a squeezed, sideways-scrolling table */}
+            <div className="divide-y divide-gray-100 dark:divide-gray-800 sm:hidden">
+              {list.data!.items.map((s) => (
+                <div key={s.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <Link to={`/students/${s.id}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+                        {s.fullName}
+                      </Link>
+                      <p className="font-mono text-xs text-gray-500">{s.studentId}</p>
+                    </div>
+                    <StatusBadge status={s.status} />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{s.phone}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {s.departments.map((d) => (
+                      <span key={d.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800">
+                        {departmentLabel(d.name)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>Batch {s.batch}</span>
+                    <span>Registered {fmtDate(s.createdAt)}</span>
+                  </div>
+                  <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                    <Link to={`/students/${s.id}`} className="btn-ghost flex-1 !py-2.5" aria-label={`View analytics for ${s.fullName}`}>
+                      <BarChart2 className="h-4 w-4" /> Analytics
+                    </Link>
+                    <button className="btn-ghost flex-1 !py-2.5" aria-label={`Edit ${s.fullName}`}
+                      onClick={() => { setEditing(s); setFormOpen(true); }}>
+                      <Pencil className="h-4 w-4" /> Edit
+                    </button>
+                    <button className="btn-ghost !py-2.5 !px-3 text-red-600"
+                      aria-label={isAdmin ? `Delete ${s.fullName}` : `Remove ${s.fullName} from your department`}
+                      onClick={() => setToDelete(s)}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: full table */}
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[760px]">
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
                   <tr>
