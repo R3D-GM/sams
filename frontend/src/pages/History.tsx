@@ -89,7 +89,36 @@ export default function History() {
           <EmptyState title="No sessions found" description="Adjust the filters or record a new attendance session." />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Mobile: stacked session cards */}
+            <div className="divide-y divide-gray-100 sm:hidden dark:divide-gray-800">
+              {sessions.data!.items.map((s) => (
+                <div key={`${s.date}-${s.departmentId}`} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{fmtDay(s.date)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{departmentLabel(s.departmentName)}</p>
+                    </div>
+                    <span className="font-semibold text-brand-600 dark:text-brand-400">{pct(s.percentage)}</span>
+                  </div>
+                  <div className="mt-2 flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Present {s.present}</span>
+                    <span>Absent {s.absent}</span>
+                  </div>
+                  <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                    <button className="btn-ghost flex-1 !py-2.5" onClick={() => setOpen({ date: s.date, departmentId: s.departmentId, departmentName: s.departmentName })}>
+                      <Eye className="h-4 w-4" /> View
+                    </button>
+                    <button className="btn-ghost !py-2.5 !px-3 text-red-600" aria-label="Delete session"
+                      onClick={() => setToDelete({ date: s.date, departmentId: s.departmentId })}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop / tablet: table */}
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[820px]">
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
                   <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Present</th><th className="th">Absent</th><th className="th">Rate</th><th className="th sr-only">Actions</th></tr>
