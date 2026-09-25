@@ -111,21 +111,38 @@ export default function StudentProfile() {
           {data.attendances.length === 0 ? (
             <EmptyState title="No attendance records yet" />
           ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900/60">
-                <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Status</th><th className="th">Notes</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <>
+              {/* Mobile: stacked cards */}
+              <div className="divide-y divide-gray-100 sm:hidden dark:divide-gray-800">
                 {data.attendances.map((a) => (
-                  <tr key={a.id}>
-                    <td className="td">{fmtDate(a.date)}</td>
-                    <td className="td">{departmentLabel(a.department.name)}</td>
-                    <td className="td"><StatusBadge status={a.status} /></td>
-                    <td className="td">{a.notes || "—"}</td>
-                  </tr>
+                  <div key={a.id} className="flex items-start justify-between gap-3 p-4">
+                    <div>
+                      <p className="text-sm font-medium">{fmtDate(a.date)}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{departmentLabel(a.department.name)}</p>
+                      {a.notes && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{a.notes}</p>}
+                    </div>
+                    <StatusBadge status={a.status} />
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop / tablet: table */}
+              <table className="hidden w-full sm:table">
+                <thead className="bg-gray-50 dark:bg-gray-900/60">
+                  <tr><th className="th">Date</th><th className="th">Department</th><th className="th">Status</th><th className="th">Notes</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {data.attendances.map((a) => (
+                    <tr key={a.id}>
+                      <td className="td">{fmtDate(a.date)}</td>
+                      <td className="td">{departmentLabel(a.department.name)}</td>
+                      <td className="td"><StatusBadge status={a.status} /></td>
+                      <td className="td">{a.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       </div>
