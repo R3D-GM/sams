@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { loginLimiter } from "../middleware/rateLimit";
 import * as auth from "../controllers/auth.controller";
 import * as students from "../controllers/student.controller";
 import * as attendance from "../controllers/attendance.controller";
@@ -12,7 +13,7 @@ export const router = Router();
 router.get("/health", (_req, res) => res.json({ ok: true }));
 
 // --- auth ---
-router.post("/auth/login", a(auth.login));
+router.post("/auth/login", loginLimiter, a(auth.login));
 router.get("/auth/me", requireAuth, a(auth.me));
 router.patch("/auth/profile", requireAuth, a(auth.updateProfile));
 router.post("/auth/change-password", requireAuth, a(auth.changePassword));
