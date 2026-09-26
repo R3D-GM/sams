@@ -18,6 +18,16 @@ export function errorHandler(err: any, _req: Request, res: Response, _next: Next
     return res.status(409).json({ message: `A record with this ${target} already exists` });
   }
   if (err?.code === "P2025") return res.status(404).json({ message: "Record not found" });
+
+  // Always log the full error server-side, whether or not it's shown to the client.
   console.error(err);
-  res.status(err?.status ?? 500).json({ message: err?.message ?? "Internal server error" });
+
+  const status = err?.status ?? 500;
+  // Only forward the real error message for an INTENTIONAL client error (4xx)
+  // that some route explicitly threw with that status attached — never for an
+  // unexpected/unhandled failure (500), which could otherwise leak internal
+  // details (file paths, library names, raw database errors, etc.) to whoever
+  // made the request.
+  const message = status >= 400 && status < 500 && err?.message ? err.message : "Internal server error";
+  res.status(status).json({ message });
 }
